@@ -1,0 +1,87 @@
+import random
+import os
+import pickle
+
+configfile: "/home/glbrc.org/millican/repos/nitrogen-cycle/workflow/config.yml"
+#configfile: "/home/glbrc.org/millican/repos/Slime_Py/test/config.yml"
+workdir: config["working_directory"]
+
+
+def create_tmpdir():
+    with open("/home/glbrc.org/millican/repos/metagenome_snakemake/etc/adj-aml.pkl", 'rb') as f:
+        adj, aml = pickle.load(f)
+    temp_dir_base = "/home/glbrc.org/millican/TMPDIR"    # Replace with the base path for temporary directories
+    # Construct the temporary directory path
+    tmpdir = os.path.join(temp_dir_base, f"{random.choice(adj)}-{random.choice(aml)}")
+    # Check if the directory exists, and find a new combination if it does
+    while os.path.exists(tmpdir):
+        tmpdir = os.path.join(temp_dir_base, f"{random.choice(adj)}-{random.choice(aml)}")
+    # Once we find a combination that does not already exist
+    # Create the temporary directory
+    os.makedirs(tmpdir, exist_ok=True)
+    return tmpdir
+
+rule all:
+    input:
+        expand("{output_directory}/{sample_name}.fgz", output_directory = config["output_directory"], sample_name = config["sample_name"])
+
+
+rule process:
+    input:
+        expand("{input_directory}/{{sample_name}}.txt", input_directory = config["input_directory"])
+    output:
+        "{output_directory}/{sample_name}.faa.gz"
+    threads: 1
+    resources: 
+        mem_mb = 8000
+    conda:
+        "slime-py"
+    shell:
+        """
+        scripts/parse_seqs.py {input} {output}
+        """
+
+rule search:
+    input:
+        "{output_directory}/{sample_name}.faa.gz"
+    output:
+        "{output_directory}/{sample_name}.hits.txt"
+    params:
+        target = config["reference_database"],
+        tmpdir = create_tmpdir()
+    threads: 12
+    resources: 
+        mem_mb = 200000
+    conda:
+        "slime-py"
+    shell:
+        """ 
+        export MMSEQS_FORCE_MERGE=1
+        mmseqs createdb {input} {params.tmpdir}/queryDB
+        mmseqs search {params.tmpdir}/queryDB {params.target} {params.tmpdir}/result {params.tmpdir}/tmp --start-sens 1 --sens-steps 3 -s 7 --merge-query 1 --threads {threads}
+        mmseqs filterdb {params.tmpdir}/result {params.tmpdir}/bestDB --extract-lines 1 --threads {threads}
+        mmseqs convertalis {params.tmpdir}/queryDB {params.target} {params.tmpdir}/bestDB {output} --format-mode 0 --db-load-mode 3 --format-output theader,tseq --threads {threads}
+        rm -rf {params.tmpdir}
+        """
+
+rule convert:
+    input:
+        "{output_directory}/{sample_name}.hits.txt"
+    output:
+        "{output_directory}/{sample_name}.fna"
+    conda:
+        "slime-py"
+    shell:
+        """
+        scripts/convert_hits.py {input} {output}
+        """
+
+rule compress:
+    input:
+        "{output_directory}/{sample_name}.fna"
+    output:
+        "{output_directory}/{sample_name}.fgz"
+    shell:
+        """
+        gzip -c {input} > {output}
+        """

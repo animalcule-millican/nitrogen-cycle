@@ -1,0 +1,5 @@
+input_directory: "/home/glbrc.org/millican/repos/trait-mapper/nitrogen-cycle"
+output_directory: "/home/glbrc.org/millican/repos/nitrogen-cycle/workflow/output"
+sample_name: ['nrfB', 'anfG', 'pmoA', 'amoB_B', 'nifD', 'napC', 'hdh', 'amoC_B', 'narZ', 'nrfD', 'hao', 'nosZ', 'amoA_B', 'nxrB', 'amoA_A', 'napA', 'norC', 'nirS', 'amoC_A', 'nrfA', 'amoB_A']
+reference_database: "/home/glbrc.org/millican/ref_db/trait_db/NT/NTDB"
+working_directory: "/home/glbrc.org/millican/repos/nitrogen-cycle/workflow"
